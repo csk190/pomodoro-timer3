@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 뽀모도로 타이머</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        .timer-display {
+            font-weight: 900;
+            font-size: 8rem;
+            line-height: 1;
+        }
+        @media (max-width: 640px) {
+            .timer-display {
+                font-size: 5rem;
+            }
+        }
+        .tab.active {
+            background-color: #F87171;
+            color: white;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #ef4444;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md mx-auto">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold">AI 뽀모도로 타이머</h1>
+            <p class="text-slate-400 mt-2">집중력을 높여보세요</p>
+        </div>
+
+        <!-- Main Timer Card -->
+        <div class="bg-slate-800 rounded-2xl shadow-2xl p-6 mb-6">
+            <!-- Mode Tabs -->
+            <div class="flex justify-center bg-slate-700/50 rounded-full p-1 mb-6">
+                <button id="pomodoro-tab" class="tab active w-full py-2 px-4 rounded-full text-sm font-bold transition-colors duration-300">뽀모도로</button>
+                <button id="short-break-tab" class="tab w-full py-2 px-4 rounded-full text-sm font-bold transition-colors duration-300">짧은 휴식</button>
+                <button id="long-break-tab" class="tab w-full py-2 px-4 rounded-full text-sm font-bold transition-colors duration-300">긴 휴식</button>
+            </div>
+
+            <!-- Timer Display -->
+            <div class="text-center my-8">
+                <div id="timer-display" class="timer-display text-red-400">25:00</div>
+            </div>
+            
+            <!-- AI Break Suggestion Box -->
+            <div id="suggestion-box" class="hidden text-center my-4 p-4 bg-slate-700/50 rounded-lg">
+                <h3 class="font-bold mb-2 text-red-300">✨ AI 휴식 추천</h3>
+                <p id="suggestion-text" class="text-slate-300"></p>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="flex flex-col space-y-4">
+                 <button id="start-pause-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-8 rounded-xl text-2xl tracking-wider shadow-lg transform hover:scale-105 transition-all duration-300">
+                    시작
+                </button>
+                <button id="reset-btn" class="w-full bg-slate-600 hover:bg-slate-700 text-slate-300 font-bold py-2 px-6 rounded-xl transition-colors duration-300">
+                    초기화
+                </button>
+            </div>
+        </div>
+        
+        <!-- AI Task Management Card -->
+        <div class="bg-slate-800 rounded-2xl shadow-2xl p-6">
+            <h2 class="text-xl font-bold text-center mb-4">오늘의 목표 관리</h2>
+            <div class="flex flex-col space-y-3">
+                <input type="text" id="task-input" class="w-full bg-slate-700 text-white placeholder-slate-400 p-3 rounded-lg border-2 border-slate-600 focus:border-red-500 focus:outline-none" placeholder="오늘 달성할 큰 목표를 입력하세요...">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <button id="generate-tasks-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center space-x-2 transition-colors duration-300">
+                        <span>✨ 목표 세분화</span>
+                    </button>
+                    <button id="generate-music-btn" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center space-x-2 transition-colors duration-300">
+                        <span>✨ 집중 음악 추천</span>
+                    </button>
+                </div>
+            </div>
+            <div id="task-list" class="mt-4 text-slate-300 space-y-2"></div>
+            <div id="music-suggestion" class="mt-4 text-slate-300 space-y-2"></div>
+        </div>
+
+        <div class="text-center mt-6 text-slate-500 text-sm">
+            뽀모도로 횟수: <span id="pomodoro-count">0</span>
+        </div>
+    </div>
+
+    <script>
+        window.onload = () => {
+            // DOM Elements
+            const timerDisplay = document.getElementById('timer-display');
+            const startPauseBtn = document.getElementById('start-pause-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const pomodoroTab = document.getElementById('pomodoro-tab');
+            const shortBreakTab = document.getElementById('short-break-tab');
+            const longBreakTab = document.getElementById('long-break-tab');
+            const pomodoroCountDisplay = document.getElementById('pomodoro-count');
+            const taskInput = document.getElementById('task-input');
+            const generateTasksBtn = document.getElementById('generate-tasks-btn');
+            const generateMusicBtn = document.getElementById('generate-music-btn');
+            const taskList = document.getElementById('task-list');
+            const musicSuggestion = document.getElementById('music-suggestion');
+            const suggestionBox = document.getElementById('suggestion-box');
+            const suggestionText = document.getElementById('suggestion-text');
+
+            // Timer settings in seconds
+            const timers = {
+                pomodoro: 25 * 60,
+                shortBreak: 5 * 60,
+                longBreak: 15 * 60,
+            };
+
+            // Timer state
+            let currentMode = 'pomodoro';
+            let timeLeft = timers.pomodoro;
+            let timerId = null;
+            let isRunning = false;
+            let pomodoroCount = 0;
+            let synth = null;
+            
+            // --- Gemini API Functions ---
+            const API_KEY = ""; // Provided by the environment
+            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+
+            async function callGemini(prompt) {
+                try {
+                    const payload = {
+                        contents: [{ role: "user", parts: [{ text: prompt }] }]
+                    };
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorBody = await response.json().catch(() => ({}));
+                        const errorMessage = errorBody?.error?.message || `API 요청 실패: ${response.status}`;
+                        throw new Error(errorMessage);
+                    }
+
+                    const result = await response.json();
+                    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (text) {
+                        return text;
+                    } else {
+                        console.warn("AI response is empty or in an unexpected format.", result);
+                        return "AI가 적절한 응답을 생성하지 못했습니다. 다시 시도해 주세요.";
+                    }
+                } catch (error) {
+                    console.error("Gemini API 호출 오류:", error);
+                    return `오류: ${error.message || "알 수 없는 오류가 발생했습니다."}`;
+                }
+            }
+
+            async function generateAndDisplayTasks() {
+                const mainTask = taskInput.value.trim();
+                if (!mainTask) {
+                    taskList.innerHTML = '<p class="text-red-400">먼저 목표를 입력해주세요.</p>';
+                    return;
+                }
+
+                taskList.innerHTML = '<div class="loader"></div>';
+                musicSuggestion.innerHTML = '';
+                generateTasksBtn.disabled = true;
+                generateMusicBtn.disabled = true;
+
+                const prompt = `당신은 생산성 전문가입니다. 다음 목표를 25분 뽀모도로 세션에 적합한 3-4개의 구체적인 하위 작업으로 나누어 주세요. 각 작업은 명확하고 실행 가능해야 합니다. 응답은 한국어로, 번호가 매겨진 목록 형식으로만 제공해주세요. 목표: "${mainTask}"`;
+                
+                const generatedText = await callGemini(prompt);
+
+                if (generatedText && !generatedText.startsWith("오류:") && !generatedText.startsWith("AI가")) {
+                    const tasks = generatedText.split('\n').filter(line => line.trim() !== '');
+                    taskList.innerHTML = tasks.map(task => `<div class="p-2 bg-slate-700/50 rounded-md">${task.replace(/^\d+\.\s*/, '')}</div>`).join('');
+                } else {
+                    taskList.innerHTML = `<p class="text-red-400">${generatedText || '작업을 생성하는 데 실패했습니다.'}</p>`;
+                }
+                generateTasksBtn.disabled = false;
+                generateMusicBtn.disabled = false;
+            }
+
+            /**
+             * [MODIFIED] Parses the music suggestion and creates a clickable YouTube link.
+             */
+            async function getAndDisplayMusicSuggestion() {
+                const mainTask = taskInput.value.trim();
+                if (!mainTask) {
+                    musicSuggestion.innerHTML = '<p class="text-sky-400">음악을 추천받으려면 먼저 목표를 입력해주세요.</p>';
+                    return;
+                }
+
+                musicSuggestion.innerHTML = '<div class="loader"></div>';
+                taskList.innerHTML = '';
+                generateTasksBtn.disabled = true;
+                generateMusicBtn.disabled = true;
+
+                const prompt = `당신은 생산성 및 음악 큐레이터입니다. 사용자가 집중할 수 있도록 도와주는 것이 당신의 임무입니다. 다음 목표에 집중하기 좋은 음악 장르나 유튜브 검색어를 추천해주세요. 응답은 한국어로, "추천 장르: [장르]"와 "유튜브 검색어: [검색어]" 형식으로 간결하게 제공해주세요. 목표: "${mainTask}"`;
+
+                const generatedText = await callGemini(prompt);
+                
+                if (generatedText && !generatedText.startsWith("오류:") && !generatedText.startsWith("AI가")) {
+                    let genre = "알 수 없음";
+                    let searchQuery = null;
+
+                    const lines = generatedText.split('\n');
+                    lines.forEach(line => {
+                        if (line.toLowerCase().includes("추천 장르:")) {
+                            genre = line.split(':')[1]?.trim() || genre;
+                        } else if (line.toLowerCase().includes("유튜브 검색어:")) {
+                            searchQuery = line.split(':')[1]?.trim();
+                        }
+                    });
+
+                    if (searchQuery) {
+                        const youtubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
+                        const linkHTML = `
+                            <div class="p-3 bg-slate-700/50 rounded-md space-y-2">
+                                <p><span class="font-bold">추천 장르:</span> ${genre}</p>
+                                <div>
+                                    <span class="font-bold">추천 검색어:</span>
+                                    <a href="${youtubeUrl}" target="_blank" class="ml-2 text-sky-400 hover:text-sky-300 underline transition-colors duration-200">
+                                        ${searchQuery} (YouTube에서 검색)
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>`;
+                        musicSuggestion.innerHTML = linkHTML;
+                    } else {
+                        // Fallback if parsing fails
+                        musicSuggestion.innerHTML = `<div class="p-3 bg-slate-700/50 rounded-md whitespace-pre-wrap">${generatedText}</div>`;
+                    }
+                } else {
+                     musicSuggestion.innerHTML = `<p class="text-red-400">${generatedText || '음악 추천을 생성하는 데 실패했습니다.'}</p>`;
+                }
+
+                generateTasksBtn.disabled = false;
+                generateMusicBtn.disabled = false;
+            }
+            
+            async function getAndDisplayBreakSuggestion(breakDurationInMinutes) {
+                suggestionText.innerHTML = '<div class="loader !w-4 !h-4 !border-2"></div>';
+                
+                const prompt = `당신은 건강 및 웰빙 코치입니다. 공부나 일로부터 ${breakDurationInMinutes}분간의 짧은 휴식을 위한 상쾌한 활동을 한 가지만 추천해주세요. 이 활동은 재충전과 집중력 향상에 도움이 되어야 합니다. 응답은 한국어로, 한 문장의 짧은 제안으로만 해주세요.`;
+                
+                const suggestion = await callGemini(prompt);
+                suggestionText.textContent = suggestion || "물을 마시며 잠시 창밖을 보세요.";
+            }
+
+            // --- Timer Functions ---
+
+            function updateDisplay() {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                document.title = `${timerDisplay.textContent} - 뽀모도로 타이머`;
+            }
+
+            function switchMode(mode) {
+                currentMode = mode;
+                timeLeft = timers[mode];
+                
+                clearInterval(timerId);
+                timerId = null;
+                isRunning = false;
+                startPauseBtn.textContent = '시작';
+
+                document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+                document.getElementById(`${mode.replace('B', '-b')}-tab`).classList.add('active');
+                
+                if (mode === 'pomodoro') {
+                    suggestionBox.classList.add('hidden');
+                } else {
+                    suggestionBox.classList.remove('hidden');
+                    getAndDisplayBreakSuggestion(timers[mode] / 60);
+                }
+                
+                updateDisplay();
+            }
+
+            function startTimer() {
+                if (isRunning) return;
+                isRunning = true;
+                startPauseBtn.textContent = '정지';
+                
+                if (typeof Tone !== 'undefined' && !synth) {
+                    Tone.start().then(() => {
+                        console.log("Audio context started successfully.");
+                        synth = new Tone.Synth().toDestination();
+                    }).catch(e => {
+                        console.error("Error starting audio context:", e);
+                    });
+                }
+
+                timerId = setInterval(() => {
+                    timeLeft--;
+                    updateDisplay();
+
+                    if (timeLeft <= 0) {
+                        clearInterval(timerId);
+                        timerId = null;
+                        isRunning = false;
+                        
+                        if (synth) {
+                            synth.triggerAttackRelease("C5", "0.5");
+                        }
+
+                        if (currentMode === 'pomodoro') {
+                            pomodoroCount++;
+                            pomodoroCountDisplay.textContent = pomodoroCount;
+                            if (pomodoroCount > 0 && pomodoroCount % 4 === 0) {
+                                switchMode('longBreak');
+                            } else {
+                                switchMode('shortBreak');
+                            }
+                        } else {
+                            switchMode('pomodoro');
+                        }
+                        setTimeout(() => startTimer(), 1500);
+                    }
+                }, 1000);
+            }
+
+            function pauseTimer() {
+                if (!isRunning) return;
+                isRunning = false;
+                startPauseBtn.textContent = '계속';
+                clearInterval(timerId);
+                timerId = null;
+            }
+
+            function resetTimer() {
+                clearInterval(timerId);
+                timerId = null;
+                isRunning = false;
+                timeLeft = timers[currentMode];
+                startPauseBtn.textContent = '시작';
+                updateDisplay();
+            }
+
+            // --- Event Listeners ---
+
+            startPauseBtn.addEventListener('click', () => {
+                if (isRunning) {
+                    pauseTimer();
+                } else {
+                    startTimer();
+                }
+            });
+
+            resetBtn.addEventListener('click', resetTimer);
+
+            pomodoroTab.addEventListener('click', () => switchMode('pomodoro'));
+            shortBreakTab.addEventListener('click', () => switchMode('shortBreak'));
+            longBreakTab.addEventListener('click', () => switchMode('longBreak'));
+            
+            generateTasksBtn.addEventListener('click', generateAndDisplayTasks);
+            generateMusicBtn.addEventListener('click', getAndDisplayMusicSuggestion);
+
+            taskInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    generateAndDisplayTasks();
+                }
+            });
+
+            // --- Initial Setup ---
+            updateDisplay();
+        };
+    </script>
+</body>
+</html>
