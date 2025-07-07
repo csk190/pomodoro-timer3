@@ -138,10 +138,17 @@
             let synth = null;
             
             // --- Gemini API Functions ---
-            const API_KEY = ""; // Provided by the environment
-            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+            // [FIX] Add your Gemini API key here. You can get one from Google AI Studio.
+            const API_KEY = "AIzaSyCFT7Jodt4oQdZy-HYHe6HnFLCIdUx_hwk"; 
 
             async function callGemini(prompt) {
+                // [FIX] Check if the API key has been replaced.
+                if (API_KEY === "AIzaSyCFT7Jodt4oQdZy-HYHe6HnFLCIdUx_hwk" || !API_KEY) {
+                    return "오류: Gemini API 키를 입력해주세요. 스크립트 상단의 'YOUR_API_KEY_HERE'를 자신의 키로 교체해야 합니다.";
+                }
+
+                const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+                
                 try {
                     const payload = {
                         contents: [{ role: "user", parts: [{ text: prompt }] }]
@@ -199,9 +206,6 @@
                 generateMusicBtn.disabled = false;
             }
 
-            /**
-             * [MODIFIED] Parses the music suggestion and creates a clickable YouTube link.
-             */
             async function getAndDisplayMusicSuggestion() {
                 const mainTask = taskInput.value.trim();
                 if (!mainTask) {
@@ -248,7 +252,6 @@
                             </div>`;
                         musicSuggestion.innerHTML = linkHTML;
                     } else {
-                        // Fallback if parsing fails
                         musicSuggestion.innerHTML = `<div class="p-3 bg-slate-700/50 rounded-md whitespace-pre-wrap">${generatedText}</div>`;
                     }
                 } else {
